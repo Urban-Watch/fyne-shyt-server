@@ -2,10 +2,8 @@
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 
-# Database and ORM
-supabase==2.0.2
-asyncpg==0.29.0
-sqlalchemy==2.0.23
+# Database client
+supabase==2.5.0
 
 # Redis for caching and queues
 redis==5.0.1
