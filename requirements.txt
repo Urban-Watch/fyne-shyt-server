@@ -20,7 +20,7 @@ python-multipart==0.0.6
 ultralytics==8.2.52
 opencv-python==4.8.1.78
 Pillow==10.4.0
-numpy==1.24.3
+numpy==1.26.4
 google-generativeai==0.3.2
 
 # Geospatial calculations
@@ -28,6 +28,10 @@ geopy==2.4.0
 
 # Background tasks
 celery==5.3.4
+
+# Build tools
+setuptools==70.1.1
+wheel==0.43.0
 
 # Environment and configuration
 python-dotenv==1.0.0
