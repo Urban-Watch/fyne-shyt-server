@@ -93,15 +93,22 @@ def analyze_waste(image_path):
 
     overall_conf = max(confidences)
 
-    # Combine area + count contributions
-    severity = severity_area_sum + severity_count_sum
+    # Density factor: if many detections or high confidence, boost severity
+    num_objects = len(confidences)
+    density_factor = min((num_objects * 0.1) + (overall_conf * 0.3), 1.0)
 
-    # Cap to [0, 1]
+    severity = severity_area_sum + severity_count_sum + density_factor
     severity = min(severity, 1.0)
+
 
     # Hazardous items boost severity minimum
     if hazardous_detected:
         severity = max(severity, 0.6)
 
+    if overall_conf > 0.7 and severity < 0.2:
+        severity = 0.6   # assume significant trash presence
+
     return overall_conf, severity
+
+
 

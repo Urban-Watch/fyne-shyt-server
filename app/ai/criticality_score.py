@@ -33,89 +33,58 @@ def normalize_reports(count: int, report_cap: int = 10) -> float:
     return result
 
 def compute_criticality_score(
-    severity: float,                # between 0 and 1 (0=no severity, 1=max)
-    impact: float,                  # between 0 and 100 (your impact_score)
-    age_seconds: Optional[float],   # how old the problem is in seconds
-    report_count: int = 1,          # number of duplicate reports in same cluster
+    severity: float,
+    impact: float,
+    age_seconds: Optional[float],
+    report_count: int = 1,
     weights: Optional[Dict[str, float]] = None,
     caps: Optional[Dict[str, float]] = None
 ) -> Dict[str, Any]:
-    """
-    Returns dict:
-      {
-        "criticality": float (0-100),
-        "components": {"severity":..., "impact_norm":..., "urgency":..., "reports_norm":...},
-        "raw_score": float (0-1)
-      }
-    Default combination (recommended):
-      criticality_raw = severity * (w_i*impact_norm + w_u*urgency + w_r*reports_norm)
-      criticality = criticality_raw * 100
-    """
+    import math
+    logger.info("=== CRITICALITY_SCORE COMPUTE STARTED ===")
 
-    logger.info("=== CRITICALITY_SCORE.PY COMPUTE_CRITICALITY_SCORE STARTED ===")
-    logger.info(f"Input: severity={severity}, impact={impact}, age_seconds={age_seconds}, report_count={report_count}")
-
-    # --- defaults (tweakable) ---
+    # Default weights
     if weights is None:
         weights = {"impact": 0.6, "urgency": 0.25, "reports": 0.15}
-    # ensure weights sum to 1 (normalize if not)
     w_sum = sum(weights.values())
-    if w_sum <= 0:
-        raise ValueError("Weights must sum to > 0")
     weights = {k: v / w_sum for k, v in weights.items()}
-    logger.info(f"Normalized weights: {weights}")
 
-    if caps is None:
-        caps = {"pop_scale": 100.0}  # unused here, kept for future extension
-
-    # --- clamp severity ---
     sev = max(0.0, min(1.0, float(severity)))
-    logger.info(f"Clamped severity: {sev}")
+    # nonlinear severity adjustment
+    sev_adj = sev ** 1.5
 
-    # --- normalize impact (0-100 -> 0-1) ---
     impact_norm = max(0.0, min(1.0, float(impact) / 100.0))
-    logger.info(f"Normalized impact: {impact_norm}")
-
-    # --- urgency normalization ---
-    if age_seconds is None:
-        # If age unknown, treat as low urgency by default (0)
-        urgency_norm = 0.0
-        logger.info("Age seconds is None, setting urgency_norm to 0.0")
-    else:
-        urgency_norm = normalize_urgency(age_seconds, cap_days=30.0)
-        logger.info(f"Calculated urgency_norm: {urgency_norm} from age_seconds={age_seconds}")
-
-    # --- reports normalization ---
+    urgency_norm = normalize_urgency(age_seconds, cap_days=30.0) if age_seconds else 0.0
     reports_norm = normalize_reports(report_count, report_cap=10)
-    logger.info(f"Calculated reports_norm: {reports_norm} from report_count={report_count}")
 
-    # --- combine and convert to integer 1-100 scale ---
-    raw_score = sev * (
+    # dynamic weighting: urgency weighs more if severity is high
+    if sev > 0.7:
+        weights = {"impact": 0.4, "urgency": 0.4, "reports": 0.2}
+
+    raw_score = sev_adj * (
         weights["impact"] * impact_norm +
         weights["urgency"] * urgency_norm +
         weights["reports"] * reports_norm
     )
-    
-    # Convert to integer with ceiling to ensure minimum value of 1
-    import math
-    criticality_float = raw_score * 100.0
-    criticality = max(1, math.ceil(criticality_float))
 
-    logger.info(f"Raw score calculation: {raw_score}")
-    logger.info(f"Final criticality score: {criticality_float:.2f} -> {criticality} (1-100 scale)")
+    # floor boost for critical cases
+    if impact_norm >= 0.8 or urgency_norm >= 0.8:
+        raw_score = min(1.0, raw_score + 0.1)
+
+    # logistic scaling for spread
+    criticality_float = 100 * (1 / (1 + math.exp(-5 * (raw_score - 0.5))))
+    criticality = max(1, int(round(criticality_float)))
 
     result = {
         "criticality": criticality,
         "raw_score": round(float(raw_score), 4),
         "components": {
             "severity": round(sev, 3),
-            "impact_norm": round(impact_norm, 4),
-            "urgency": round(urgency_norm, 4),
-            "reports_norm": round(reports_norm, 4),
+            "severity_adj": round(sev_adj, 3),
+            "impact_norm": round(impact_norm, 3),
+            "urgency": round(urgency_norm, 3),
+            "reports_norm": round(reports_norm, 3),
             "weights": {k: round(v, 3) for k, v in weights.items()}
         }
     }
-
-    logger.info(f"=== CRITICALITY_SCORE.PY COMPUTE_CRITICALITY_SCORE COMPLETED ===")
-    logger.info(f"Final result: {result}")
     return result

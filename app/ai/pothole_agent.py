@@ -39,7 +39,8 @@ def get_confidence_and_severity(image_path):
     img_area = H * W
 
     confidences = []
-    total_area = 0
+    severity_area_sum = 0.0
+    severity_count_sum = 0.0
 
     for result in results:
         for box in result.boxes:
@@ -49,15 +50,22 @@ def get_confidence_and_severity(image_path):
             # Bounding box area
             x1, y1, x2, y2 = box.xyxy[0]
             box_area = (x2 - x1) * (y2 - y1)
-            total_area += box_area
 
-    if len(confidences) == 0:
+            # Area-based contribution (relative size of pothole)
+            severity_area_sum += (box_area / img_area) * conf
+
+            # Count-based contribution (each pothole matters, even if small)
+            severity_count_sum += 0.1 * conf  # tweak factor → importance of count
+
+    if not confidences:
         return 0.0, 0.0   # No pothole detected
 
-    # Overall confidence = max confidence
     overall_conf = max(confidences)
 
-    # Severity = total pothole area / image area (normalized to 0–1)
-    severity = min(total_area / img_area, 1.0)
+    # Combine area + count contributions
+    severity = severity_area_sum + severity_count_sum
+
+    # Cap to [0, 1]
+    severity = min(severity, 1.0)
 
     return overall_conf, severity

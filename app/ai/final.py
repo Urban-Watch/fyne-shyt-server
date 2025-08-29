@@ -117,6 +117,36 @@ def process_image(image, address="Unknown location", pothole_weights="app/ai/mod
 
         # Calculate overall severity score and convert to 1-100 integer scale
         severity_score_float = (0.6 * pothole_sev + 0.4 * trash_sev)
+
+        # --- Calculate overall metrics ---
+        severity_score_float = (0.6 * pothole_sev + 0.4 * trash_sev)
+        overall_confidence = (pothole_conf + trash_conf) / 2
+
+            # --- Calculate overall metrics (threshold-based) ---
+        if (pothole_sev >= 0.7 and pothole_conf >= 0.6) or (trash_sev >= 0.7 and trash_conf >= 0.6):
+            # If either hazard is clearly severe & confident
+            severity_score_float = max(pothole_sev, trash_sev)
+            overall_confidence = max(pothole_conf, trash_conf)
+
+        elif pothole_sev >= 0.4 and trash_sev >= 0.4:
+            # Both moderately severe → escalate
+            severity_score_float = (pothole_sev + trash_sev) / 2 + 0.2
+            severity_score_float = min(severity_score_float, 1.0)  # cap at 1
+            overall_confidence = (pothole_conf + trash_conf) / 2
+
+        else:
+            # Otherwise, use weighted contribution but scale by confidence
+            weighted_pothole = pothole_sev * pothole_conf
+            weighted_trash = trash_sev * trash_conf
+            severity_score_float = min(weighted_pothole + weighted_trash, 1.0)
+
+            # Confidence favors whichever issue is more severe
+            if pothole_sev > trash_sev:
+                overall_confidence = pothole_conf
+            else:
+                overall_confidence = trash_conf
+
+
         # Convert 0-1 scale to 1-100 and use ceiling to ensure minimum value of 1
         import math
         severity_score = max(1, math.ceil(severity_score_float * 100))
