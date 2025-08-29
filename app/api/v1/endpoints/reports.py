@@ -182,6 +182,8 @@ async def get_reports(
                         "report_id": report.report_id,
                         "category": report.category,
                         "title": report.title,
+                        "description": report.ai_analysis,
+                        "images": report.images,
                         "status": report.status,
                         "criticality_score": report.criticality_score,
                         "location": report.location.dict(),
