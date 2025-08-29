@@ -96,7 +96,7 @@ def process_image(image, address="Unknown location", pothole_weights="app/ai/mod
         logger.info("Starting parallel AI inference for pothole and trash detection")
         with concurrent.futures.ThreadPoolExecutor() as executor:
             pothole_future = executor.submit(
-                lambda: pothole_infer(load_yolo_model_safely(pothole_weights)(image_path), image_path)
+                lambda: pothole_infer(image_path)
             )
             trash_future = executor.submit(
                 lambda: analyze_waste(image_path)
@@ -119,7 +119,7 @@ def process_image(image, address="Unknown location", pothole_weights="app/ai/mod
         severity_score_float = (0.6 * pothole_sev + 0.4 * trash_sev)
         # Convert 0-1 scale to 1-100 and use ceiling to ensure minimum value of 1
         import math
-        severity_score = max(1, math.ceil(severity_score_float * 1000))
+        severity_score = max(1, math.ceil(severity_score_float * 100))
         logger.info(f"Calculated overall severity score: {severity_score_float:.4f} -> {severity_score} (1-100 scale)")
 
         # Determine category based on confidences
@@ -211,14 +211,14 @@ Respond ONLY with TITLE and DESCRIPTION sections. No other text."""
             os.unlink(temp_path)
             logger.info(f"Cleaned up temporary file: {temp_path}")
 
-# --- Example Run ---
-if __name__ == "__main__":
-    # Example with PIL Image
-    img_path = "C:/Users/Lenovo/OneDrive/Documents/7th semester/smart city/t.jpeg"
-    try:
-        pil_img = PIL.Image.open(img_path)
-        output = process_image(pil_img)
-        print(json.dumps(output, indent=2))
-    except FileNotFoundError:
-        print("Example image not found - this is expected in different environments")
-        print("Function now accepts PIL Image objects instead of file paths")
+# # --- Example Run ---
+# if __name__ == "__main__":
+#     # Example with PIL Image
+#     img_path = "./test0.avif"
+#     try:
+#         pil_img = PIL.Image.open(img_path)
+#         output = process_image(pil_img)
+#         print(json.dumps(output, indent=2))
+#     except FileNotFoundError:
+#         print("Example image not found - this is expected in different environments")
+#         print("Function now accepts PIL Image objects instead of file paths")

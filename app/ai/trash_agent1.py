@@ -41,6 +41,8 @@ CATEGORY_WEIGHTS = {
     "hazardous": 1.0
 }
 
+model = load_yolo_model_safely("app/ai/models/trash_new.pt")
+
 def get_category(label):
     if label in RECYCLABLE:
         return "recyclable"
@@ -52,48 +54,54 @@ def get_category(label):
         return "unknown"
 
 def analyze_waste(image_path):
-    """
-    Run YOLOv8 inference on a waste image and compute overall confidence and severity.
-    """
-    # Load model safely
-    model = load_yolo_model_safely("app/ai/models/trash_new.pt")
-
-    # Run inference
     results = model(image_path)
-
-    # Load image to calculate areas
     img = cv2.imread(image_path)
     H, W = img.shape[:2]
     img_area = H * W
 
     confidences = []
-    weighted_area = 0
+    severity_area_sum = 0.0
+    severity_count_sum = 0.0
+    hazardous_detected = False
 
     for result in results:
-        names = result.names  # class id -> label mapping
+        names = result.names
         for box in result.boxes:
             cls = int(box.cls[0])
             label = names[cls]
             conf = float(box.conf[0])
             confidences.append(conf)
 
-            # bounding box area
             x1, y1, x2, y2 = box.xyxy[0]
             box_area = (x2 - x1) * (y2 - y1)
 
-            # category weight
             category = get_category(label)
             weight = CATEGORY_WEIGHTS.get(category, 0.5)
 
-            weighted_area += box_area * weight
+            # Area-based severity (proportional to image area)
+            severity_area_sum += (box_area / img_area) * weight * conf
 
-    if len(confidences) == 0:
+            # Count-based severity (each item matters)
+            severity_count_sum += 0.05 * weight * conf  # tweak factor 0.05 → controls importance of count
+
+            # Hazardous override check
+            if category == "hazardous" and conf > 0.5:
+                hazardous_detected = True
+
+    if not confidences:
         return 0.0, 0.0
 
-    # confidence = max detection confidence
     overall_conf = max(confidences)
 
-    # severity = weighted area / image area (clamped 0–1)
-    severity = min(weighted_area / img_area, 1.0)
+    # Combine area + count contributions
+    severity = severity_area_sum + severity_count_sum
+
+    # Cap to [0, 1]
+    severity = min(severity, 1.0)
+
+    # Hazardous items boost severity minimum
+    if hazardous_detected:
+        severity = max(severity, 0.6)
 
     return overall_conf, severity
+
