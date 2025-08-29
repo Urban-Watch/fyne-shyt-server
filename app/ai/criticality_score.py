@@ -71,9 +71,12 @@ def compute_criticality_score(
     if impact_norm >= 0.8 or urgency_norm >= 0.8:
         raw_score = min(1.0, raw_score + 0.1)
 
-    # logistic scaling for spread
-    criticality_float = 100 * (1 / (1 + math.exp(-5 * (raw_score - 0.5))))
-    criticality = max(1, int(round(criticality_float)))
+    scaled_score = raw_score * 2.5   # stretch
+    criticality_float = 100 * (1 / (1 + math.exp(-5 * (scaled_score - 0.5))))
+    if severity > 0:
+        criticality_float = max(20, criticality_float)
+    criticality = int(round(criticality_float))
+
 
     result = {
         "criticality": criticality,

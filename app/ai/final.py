@@ -115,9 +115,6 @@ def process_image(image, address="Unknown location", pothole_weights="app/ai/mod
         logger.info(f"  Pothole - Confidence: {pothole_conf:.4f}, Severity: {pothole_sev:.4f}")
         logger.info(f"  Trash - Confidence: {trash_conf:.4f}, Severity: {trash_sev:.4f}")
 
-        # Calculate overall severity score and convert to 1-100 integer scale
-        severity_score_float = (0.6 * pothole_sev + 0.4 * trash_sev)
-
         # --- Calculate overall metrics ---
         severity_score_float = (0.6 * pothole_sev + 0.4 * trash_sev)
         overall_confidence = (pothole_conf + trash_conf) / 2
