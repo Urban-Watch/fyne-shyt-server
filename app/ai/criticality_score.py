@@ -15,7 +15,7 @@ def normalize_urgency(age_seconds: float, cap_days: float = 30.0) -> float:
     """
     age_days = max(0.0, age_seconds) / (3600.0 * 24.0)
     result = min(1.0, age_days / max(1e-9, cap_days))
-    logger.debug(f"normalize_urgency: age_seconds={age_seconds}, cap_days={cap_days}, age_days={age_days:.2f}, result={result:.4f}")
+    # logger.debug(f"normalize_urgency: age_seconds={age_seconds}, cap_days={cap_days}, age_days={age_days:.2f}, result={result:.4f}")
     return result
 
 def normalize_reports(count: int, report_cap: int = 10) -> float:
@@ -29,7 +29,7 @@ def normalize_reports(count: int, report_cap: int = 10) -> float:
         return 0.0
     # log1p gives diminishing returns; divide by log1p(report_cap) to scale to ~[0,1]
     result = min(1.0, math.log1p(count) / max(1e-9, math.log1p(report_cap)))
-    logger.debug(f"normalize_reports: count={count}, report_cap={report_cap}, result={result:.4f}")
+    # logger.debug(f"normalize_reports: count={count}, report_cap={report_cap}, result={result:.4f}")
     return result
 
 def compute_criticality_score(
@@ -41,15 +41,16 @@ def compute_criticality_score(
     caps: Optional[Dict[str, float]] = None
 ) -> Dict[str, Any]:
     import math
-    logger.info("=== CRITICALITY_SCORE COMPUTE STARTED ===")
+    # logger.info("=== CRITICALITY_SCORE COMPUTE STARTED ===")
 
+    print(f"severity passed int the criticality func {severity}")
     # Default weights
     if weights is None:
         weights = {"impact": 0.6, "urgency": 0.25, "reports": 0.15}
     w_sum = sum(weights.values())
     weights = {k: v / w_sum for k, v in weights.items()}
 
-    sev = max(0.0, min(1.0, float(severity)))
+    sev = max(0.0, min(1.0, float(severity/100)))
     # nonlinear severity adjustment
     sev_adj = sev ** 1.5
 
@@ -76,6 +77,8 @@ def compute_criticality_score(
     if severity > 0:
         criticality_float = max(20, criticality_float)
     criticality = int(round(criticality_float))
+    
+    criticality  = min(100 , criticality + severity)
 
 
     result = {

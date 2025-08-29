@@ -333,9 +333,9 @@ class ReportService:
             by_criticality = {"low": 0, "medium": 0, "high": 0}
             for report in reports:
                 score = report.get("criticality_score", 0)
-                if score < 3.0:
+                if score < 40:
                     by_criticality["low"] += 1
-                elif score < 7.0:
+                elif score < 70:
                     by_criticality["medium"] += 1
                 else:
                     by_criticality["high"] += 1

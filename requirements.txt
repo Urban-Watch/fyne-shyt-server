@@ -36,7 +36,8 @@ python-dotenv==1.0.0
 pydantic-settings==2.0.3
 
 # HTTP client
-httpx==0.25.2
+# Supabase SDK expects httpx with 'proxy' kwarg support
+httpx==0.27.2
 
 # Logging and monitoring
 structlog==23.2.0
@@ -47,3 +48,4 @@ aiofiles==23.2.0
 # Testing (development)
 pytest==7.4.3
 pytest-asyncio==0.21.1
+dill==0.4.0

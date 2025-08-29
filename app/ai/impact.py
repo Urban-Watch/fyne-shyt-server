@@ -56,8 +56,8 @@ def calculate_impact_score(lat: float, lon: float, radius_km: float = 1.0) -> di
     """
     Calculate impact score for a location (standalone function)
     """
-    logger.info("=== IMPACT.PY CALCULATE_IMPACT_SCORE STARTED ===")
-    logger.info(f"Input: lat={lat}, lon={lon}, radius_km={radius_km}")
+    # logger.info("=== IMPACT.PY CALCULATE_IMPACT_SCORE STARTED ===")
+    # logger.info(f"Input: lat={lat}, lon={lon}, radius_km={radius_km}")
 
     cache_key = f"{lat}_{lon}_{radius_km}"
     logger.info(f"Cache key: {cache_key}")
@@ -84,13 +84,13 @@ def calculate_impact_score(lat: float, lon: float, radius_km: float = 1.0) -> di
         )
         pop_data = pop_resp.json()
         population = pop_data.get("data", {}).get("sum", 0)
-        logger.info(f"WorldPop API response: population={population}")
+        # logger.info(f"WorldPop API response: population={population}")
 
         if not population:  # handle empty
             raise ValueError("Empty WorldPop response")
     except Exception as e:
         population = 1200 * (radius_km ** 2)  # default estimate
-        logger.warning(f"WorldPop API failed ({str(e)}), using default population estimate: {population}")
+        # logger.warning(f"WorldPop API failed ({str(e)}), using default population estimate: {population}")
 
     # ---------------------------
     # 2. Roads / Vehicles (Overpass OSM)
@@ -102,12 +102,12 @@ def calculate_impact_score(lat: float, lon: float, radius_km: float = 1.0) -> di
         way(around:{int(radius_km*1000)},{lat},{lon})["highway"];
         out geom;
         """
-        logger.info(f"Overpass API query: {overpass_query.strip()}")
+        # logger.info(f"Overpass API query: {overpass_query.strip()}")
         road_resp = requests.get(OVERPASS_API, params={"data": overpass_query}, timeout=30)
         roads = road_resp.json().get("elements", [])
         road_length_m = len(roads) * 200  # heuristic: avg 200m per road segment
         vehicles = road_length_m / 10     # ~10 vehicles per meter of road
-        logger.info(f"Overpass API response: roads={len(roads)}, road_length_m={road_length_m}, vehicles={vehicles}")
+        # logger.info(f"Overpass API response: roads={len(roads)}, road_length_m={road_length_m}, vehicles={vehicles}")
 
         if vehicles <= 0:
             raise ValueError("No road data")
@@ -118,9 +118,9 @@ def calculate_impact_score(lat: float, lon: float, radius_km: float = 1.0) -> di
     # ---------------------------
     # 3. Impact Score
     # ---------------------------
-    logger.info("Step 3: Calculating final impact score")
+    # logger.info("Step 3: Calculating final impact score")
     area_km2 = pi * (radius_km ** 2)
-    logger.info(f"Area calculation: area_km2={area_km2}")
+    # logger.info(f"Area calculation: area_km2={area_km2}")
 
     MAX_POP_DENSITY = 7000   # per km² (Mumbai-like max)
     MAX_VEH_DENSITY = 2000   # per km² (peak traffic)
@@ -128,8 +128,8 @@ def calculate_impact_score(lat: float, lon: float, radius_km: float = 1.0) -> di
     pop_density = population / max(area_km2, 1)
     veh_density = vehicles / max(area_km2, 1)
 
-    logger.info(f"Density calculations: pop_density={pop_density:.2f}, veh_density={veh_density:.2f}")
-    logger.info(f"Max densities: MAX_POP_DENSITY={MAX_POP_DENSITY}, MAX_VEH_DENSITY={MAX_VEH_DENSITY}")
+    # logger.info(f"Density calculations: pop_density={pop_density:.2f}, veh_density={veh_density:.2f}")
+    # logger.info(f"Max densities: MAX_POP_DENSITY={MAX_POP_DENSITY}, MAX_VEH_DENSITY={MAX_VEH_DENSITY}")
 
     # Calculate impact score and convert to integer 1-100 scale
     import math
@@ -157,7 +157,7 @@ def calculate_impact_score(lat: float, lon: float, radius_km: float = 1.0) -> di
 
     # Save to cache
     set_cache(cache_key, result)
-    logger.info(f"Saved result to cache with key: {cache_key}")
+    # logger.info(f"Saved result to cache with key: {cache_key}")
 
     logger.info("=== IMPACT.PY CALCULATE_IMPACT_SCORE COMPLETED ===")
     return result
