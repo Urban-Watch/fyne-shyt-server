@@ -40,50 +40,75 @@ def compute_criticality_score(
     weights: Optional[Dict[str, float]] = None,
     caps: Optional[Dict[str, float]] = None
 ) -> Dict[str, Any]:
-    import math
-    # logger.info("=== CRITICALITY_SCORE COMPUTE STARTED ===")
+    """
+    Returns dict:
+      {
+        "criticality": float (0-100),
+        "components": {"severity":..., "impact_norm":..., "urgency":..., "reports_norm":...},
+        "raw_score": float (0-1),
+        "formula": str
+      }
+    IMPROVED Formula (weighted average):
+      criticality_raw = w_s*severity + w_i*impact_norm + w_u*urgency + w_r*reports_norm
+      criticality = criticality_raw * 100
+    """
 
-    print(f"severity passed int the criticality func {severity}")
-    # Default weights
+    logger.info("=== CRITICALITY_SCORE.PY COMPUTE_CRITICALITY_SCORE STARTED (IMPROVED) ===")
+    logger.info(f"Input: severity={severity}, impact={impact}, age_seconds={age_seconds}, report_count={report_count}")
+
+    # --- defaults (tweakable) - IMPROVED WEIGHTS ---
     if weights is None:
-        weights = {"impact": 0.6, "urgency": 0.25, "reports": 0.15}
+        weights = {"severity": 0.5, "impact": 0.3, "urgency": 0.15, "reports": 0.05}
+    # ensure weights sum to 1 (normalize if not)
     w_sum = sum(weights.values())
     weights = {k: v / w_sum for k, v in weights.items()}
+    logger.info(f"Normalized weights: {weights}")
 
-    sev = max(0.0, min(1.0, float(severity/100)))
-    # nonlinear severity adjustment
-    sev_adj = sev ** 1.5
+    if caps is None:
+        caps = {"pop_scale": 100.0}  # unused here, kept for future extension
 
+    # --- clamp severity ---
+    sev = max(0.0, min(1.0, float(severity)))
+    logger.info(f"Severity normalized: {sev}")
+
+    # --- normalize impact (0-100 -> 0-1) ---
     impact_norm = max(0.0, min(1.0, float(impact) / 100.0))
-    urgency_norm = normalize_urgency(age_seconds, cap_days=30.0) if age_seconds else 0.0
+    logger.info(f"Impact normalized: {impact_norm}")
+
+    # --- urgency normalization ---
+    if age_seconds is None:
+        # If age unknown, treat as low urgency by default (0)
+        urgency_norm = 0.0
+        logger.info("Age seconds is None, setting urgency_norm to 0.0")
+    else:
+        urgency_norm = normalize_urgency(age_seconds, cap_days=30.0)
+        logger.info(f"Urgency normalized: {urgency_norm} from age_seconds={age_seconds}")
+
+    # --- reports normalization ---
     reports_norm = normalize_reports(report_count, report_cap=10)
+    logger.info(f"Reports normalized: {reports_norm} from report_count={report_count}")
 
-    # dynamic weighting: urgency weighs more if severity is high
-    if sev > 0.7:
-        weights = {"impact": 0.4, "urgency": 0.4, "reports": 0.2}
-
-    raw_score = sev_adj * (
+    # --- IMPROVED WEIGHTED AVERAGE FORMULA ---
+    raw_score = (
+        weights["severity"] * sev +
         weights["impact"] * impact_norm +
         weights["urgency"] * urgency_norm +
         weights["reports"] * reports_norm
     )
-
-    # floor boost for critical cases
-    if impact_norm >= 0.8 or urgency_norm >= 0.8:
-        raw_score = min(1.0, raw_score + 0.1)
-
-    scaled_score = raw_score * 2.5   # stretch
-    criticality_float = 100 * (1 / (1 + math.exp(-5 * (scaled_score - 0.5))))
-    if severity > 0:
-        criticality_float = max(20, criticality_float)
-    criticality = int(round(criticality_float))
     
-    criticality  = min(100 , criticality + severity)
+    # Convert to integer with ceiling to ensure minimum value of 1
+    import math
+    criticality_float = raw_score * 100.0
+    criticality = max(1, math.ceil(criticality_float))
 
+    logger.info(f"Raw score calculation: {raw_score:.4f}")
+    logger.info(f"Final criticality score: {criticality_float:.2f} -> {criticality} (1-100 scale)")
+    logger.info(f"Formula used: Weighted Average (severity:{weights['severity']}, impact:{weights['impact']}, urgency:{weights['urgency']}, reports:{weights['reports']})")
 
     result = {
         "criticality": criticality,
         "raw_score": round(float(raw_score), 4),
+        "formula": "weighted_average",
         "components": {
             "severity": round(sev, 3),
             "severity_adj": round(sev_adj, 3),

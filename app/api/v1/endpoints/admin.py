@@ -30,12 +30,23 @@ async def get_priority_reports():
                 "priority_reports": [
                     {
                         "report_id": report.report_id,
-                        "title": report.title,
-                        "criticality_score": report.criticality_score,
+                        "user_ids": report.user_ids,
                         "people_reported": report.people_reported,
-                        "location": report.location.dict(),
                         "category": report.category,
-                        "created_at": report.created_at
+                        "title": report.title,
+                        "ai_analysis": report.ai_analysis,
+                        "images": report.images,
+                        "location": report.location.dict(),
+                        "criticality_score": report.criticality_score,
+                        "severity_score": report.severity_score,
+                        "severity_analysis": report.severity_analysis,
+                        "impact_score": report.impact_score,
+                        "impact_analysis": report.impact_analysis,
+                        "population_estimate": report.population_estimate,
+                        "vehicle_estimate": report.vehicle_estimate,
+                        "status": report.status,
+                        "created_at": report.created_at,
+                        "updated_at": report.updated_at
                     }
                     for report in priority_reports
                 ]
@@ -84,12 +95,21 @@ async def get_all_reports(
                 "reports": [
                     {
                         "report_id": report.report_id,
+                        "user_ids": report.user_ids,
+                        "people_reported": report.people_reported,
                         "category": report.category,
                         "title": report.title,
-                        "status": report.status,
-                        "criticality_score": report.criticality_score,
-                        "people_reported": report.people_reported,
+                        "ai_analysis": report.ai_analysis,
+                        "images": report.images,
                         "location": report.location.dict(),
+                        "criticality_score": report.criticality_score,
+                        "severity_score": report.severity_score,
+                        "severity_analysis": report.severity_analysis,
+                        "impact_score": report.impact_score,
+                        "impact_analysis": report.impact_analysis,
+                        "population_estimate": report.population_estimate,
+                        "vehicle_estimate": report.vehicle_estimate,
+                        "status": report.status,
                         "created_at": report.created_at,
                         "updated_at": report.updated_at
                     }
@@ -188,6 +208,12 @@ async def get_report_by_id(
                     "images": report.images,
                     "location": report.location.dict(),
                     "criticality_score": report.criticality_score,
+                    "severity_score": report.severity_score,
+                    "severity_analysis": report.severity_analysis,
+                    "impact_score": report.impact_score,
+                    "impact_analysis": report.impact_analysis,
+                    "population_estimate": report.population_estimate,
+                    "vehicle_estimate": report.vehicle_estimate,
                     "status": report.status,
                     "created_at": report.created_at,
                     "updated_at": report.updated_at
