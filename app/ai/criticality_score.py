@@ -45,19 +45,20 @@ def compute_criticality_score(
       {
         "criticality": float (0-100),
         "components": {"severity":..., "impact_norm":..., "urgency":..., "reports_norm":...},
-        "raw_score": float (0-1)
+        "raw_score": float (0-1),
+        "formula": str
       }
-    Default combination (recommended):
-      criticality_raw = severity * (w_i*impact_norm + w_u*urgency + w_r*reports_norm)
+    IMPROVED Formula (weighted average):
+      criticality_raw = w_s*severity + w_i*impact_norm + w_u*urgency + w_r*reports_norm
       criticality = criticality_raw * 100
     """
 
-    logger.info("=== CRITICALITY_SCORE.PY COMPUTE_CRITICALITY_SCORE STARTED ===")
+    logger.info("=== CRITICALITY_SCORE.PY COMPUTE_CRITICALITY_SCORE STARTED (IMPROVED) ===")
     logger.info(f"Input: severity={severity}, impact={impact}, age_seconds={age_seconds}, report_count={report_count}")
 
-    # --- defaults (tweakable) ---
+    # --- defaults (tweakable) - IMPROVED WEIGHTS ---
     if weights is None:
-        weights = {"impact": 0.6, "urgency": 0.25, "reports": 0.15}
+        weights = {"severity": 0.5, "impact": 0.3, "urgency": 0.15, "reports": 0.05}
     # ensure weights sum to 1 (normalize if not)
     w_sum = sum(weights.values())
     if w_sum <= 0:
@@ -70,11 +71,11 @@ def compute_criticality_score(
 
     # --- clamp severity ---
     sev = max(0.0, min(1.0, float(severity)))
-    logger.info(f"Clamped severity: {sev}")
+    logger.info(f"Severity normalized: {sev}")
 
     # --- normalize impact (0-100 -> 0-1) ---
     impact_norm = max(0.0, min(1.0, float(impact) / 100.0))
-    logger.info(f"Normalized impact: {impact_norm}")
+    logger.info(f"Impact normalized: {impact_norm}")
 
     # --- urgency normalization ---
     if age_seconds is None:
@@ -83,14 +84,15 @@ def compute_criticality_score(
         logger.info("Age seconds is None, setting urgency_norm to 0.0")
     else:
         urgency_norm = normalize_urgency(age_seconds, cap_days=30.0)
-        logger.info(f"Calculated urgency_norm: {urgency_norm} from age_seconds={age_seconds}")
+        logger.info(f"Urgency normalized: {urgency_norm} from age_seconds={age_seconds}")
 
     # --- reports normalization ---
     reports_norm = normalize_reports(report_count, report_cap=10)
-    logger.info(f"Calculated reports_norm: {reports_norm} from report_count={report_count}")
+    logger.info(f"Reports normalized: {reports_norm} from report_count={report_count}")
 
-    # --- combine and convert to integer 1-100 scale ---
-    raw_score = sev * (
+    # --- IMPROVED WEIGHTED AVERAGE FORMULA ---
+    raw_score = (
+        weights["severity"] * sev +
         weights["impact"] * impact_norm +
         weights["urgency"] * urgency_norm +
         weights["reports"] * reports_norm
@@ -101,12 +103,14 @@ def compute_criticality_score(
     criticality_float = raw_score * 100.0
     criticality = max(1, math.ceil(criticality_float))
 
-    logger.info(f"Raw score calculation: {raw_score}")
+    logger.info(f"Raw score calculation: {raw_score:.4f}")
     logger.info(f"Final criticality score: {criticality_float:.2f} -> {criticality} (1-100 scale)")
+    logger.info(f"Formula used: Weighted Average (severity:{weights['severity']}, impact:{weights['impact']}, urgency:{weights['urgency']}, reports:{weights['reports']})")
 
     result = {
         "criticality": criticality,
         "raw_score": round(float(raw_score), 4),
+        "formula": "weighted_average",
         "components": {
             "severity": round(sev, 3),
             "impact_norm": round(impact_norm, 4),

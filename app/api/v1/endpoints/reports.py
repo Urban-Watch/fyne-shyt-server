@@ -184,7 +184,7 @@ async def get_reports(
             offset=offset
         )
         
-        # Format response
+        # Format response with ALL available fields
         response_data = {
             "status": "success",
             "message": "Reports retrieved successfully",
@@ -192,13 +192,23 @@ async def get_reports(
                 "reports": [
                     {
                         "report_id": report.report_id,
+                        "user_ids": report.user_ids,
+                        "people_reported": report.people_reported,
                         "category": report.category,
                         "title": report.title,
-                        "status": report.status,
-                        "criticality_score": report.criticality_score,
+                        "ai_analysis": report.ai_analysis,
+                        "images": report.images,
                         "location": report.location.dict(),
-                        "people_reported": report.people_reported,
-                        "created_at": report.created_at
+                        "criticality_score": report.criticality_score,
+                        "severity_score": report.severity_score,
+                        "severity_analysis": report.severity_analysis,
+                        "impact_score": report.impact_score,
+                        "impact_analysis": report.impact_analysis,
+                        "population_estimate": report.population_estimate,
+                        "vehicle_estimate": report.vehicle_estimate,
+                        "status": report.status,
+                        "created_at": report.created_at,
+                        "updated_at": report.updated_at
                     }
                     for report in reports
                 ],
