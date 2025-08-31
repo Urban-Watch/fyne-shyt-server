@@ -28,6 +28,12 @@ class ReportBase(BaseModel):
     images: List[str] = Field(default_factory=list, description="URLs to stored images")
     location: Location
     criticality_score: int = Field(..., ge=1, le=100, description="Criticality score from 1-100")
+    severity_score: Optional[int] = Field(None, ge=1, le=1000, description="Severity score from 1-1000")
+    severity_analysis: Optional[str] = Field(None, max_length=500, description="AI analysis of severity score")
+    impact_score: Optional[int] = Field(None, ge=1, le=100, description="Impact score from 1-100")
+    impact_analysis: Optional[str] = Field(None, max_length=500, description="AI analysis of impact score")
+    population_estimate: Optional[int] = Field(None, ge=0, description="Estimated population in area")
+    vehicle_estimate: Optional[int] = Field(None, ge=0, description="Estimated vehicle count in area")
     status: ReportStatus = ReportStatus.WAITING_FOR_ATTENTION
 
 

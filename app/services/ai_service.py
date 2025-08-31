@@ -10,7 +10,7 @@ import io
 # Add the app directory to path so we can import the AI modules
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
-from app.ai.final import process_image as process_image_ai
+from app.ai.final import process_image as process_image_ai, generate_score_analysis
 from app.ai.criticality_score import compute_criticality_score
 from app.ai.impact import calculate_impact_score
 
@@ -112,19 +112,61 @@ class AIService:
         )
         logger.info(f"Criticality calculation result: {criticality_result}")
 
-        # Step 5: Combine all results
-        logger.info("Step 5: Combining all AI analysis results")
+        # Step 5: Generate individual score analyses
+        logger.info("Step 5: Generating individual score analyses using Gemini")
+        
+        # Generate severity analysis
+        severity_analysis = generate_score_analysis(
+            score_type="severity",
+            score_value=image_analysis["severity_score"],
+            image=image,
+            address=address
+        )
+        
+        # Generate impact analysis  
+        impact_analysis = generate_score_analysis(
+            score_type="impact",
+            score_value=impact_result["impact_score"],
+            image=image,
+            address=address,
+            additional_context={
+                'population_estimate': impact_result.get("population_estimate"),
+                'vehicle_estimate': impact_result.get("vehicle_estimate")
+            }
+        )
+        
+        # Generate criticality analysis
+        criticality_analysis = generate_score_analysis(
+            score_type="criticality", 
+            score_value=criticality_result["criticality"],
+            image=image,
+            address=address,
+            additional_context={
+                'severity_score': image_analysis["severity_score"],
+                'impact_score': impact_result["impact_score"]
+            }
+        )
+        
+        logger.info(f"Generated analyses - Severity: {severity_analysis[:50]}...")
+        logger.info(f"Generated analyses - Impact: {impact_analysis[:50]}...")
+        logger.info(f"Generated analyses - Criticality: {criticality_analysis[:50]}...")
+
+        # Step 6: Combine all results
+        logger.info("Step 6: Combining all AI analysis results")
         final_result = {
             "severity_score": image_analysis["severity_score"],
+            "severity_analysis": severity_analysis,
             "category": image_analysis["category"],
             "title": image_analysis["title"],
             "description": image_analysis["description"],
             "criticality_score": criticality_result["criticality"],
             "impact_score": impact_result["impact_score"],
+            "impact_analysis": impact_analysis,
             "population_estimate": impact_result.get("population_estimate"),
             "vehicle_estimate": impact_result.get("vehicle_estimate"),
             "ai_analysis_success": True,
-            "criticality_components": criticality_result["components"]
+            "criticality_components": criticality_result["components"],
+            "criticality_analysis": criticality_analysis
         }
 
         logger.info("=== AI SERVICE PIPELINE COMPLETED SUCCESSFULLY ===")

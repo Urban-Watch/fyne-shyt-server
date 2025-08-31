@@ -96,6 +96,12 @@ async def report_issue(
                 "images": [image_url],
                 "location": location_obj.dict(),
                 "criticality_score": ai_result["criticality_score"],
+                "severity_score": ai_result.get("severity_score"),
+                "severity_analysis": ai_result.get("severity_analysis"),
+                "impact_score": ai_result.get("impact_score"),
+                "impact_analysis": ai_result.get("impact_analysis"),
+                "population_estimate": ai_result.get("population_estimate"),
+                "vehicle_estimate": ai_result.get("vehicle_estimate"),
                 "status": "waiting_for_attention"
             }
 
@@ -122,8 +128,14 @@ async def report_issue(
                     "ai_analysis": {
                         "category": ai_result["category"],
                         "severity_score": ai_result["severity_score"],
+                        "severity_analysis": ai_result.get("severity_analysis"),
+                        "impact_score": ai_result.get("impact_score"),
+                        "impact_analysis": ai_result.get("impact_analysis"),
                         "criticality_score": ai_result["criticality_score"],
-                        "title": ai_result["title"]
+                        "criticality_analysis": ai_result.get("criticality_analysis"),
+                        "title": ai_result["title"],
+                        "population_estimate": ai_result.get("population_estimate"),
+                        "vehicle_estimate": ai_result.get("vehicle_estimate")
                     }
                 }
             }

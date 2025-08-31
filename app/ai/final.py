@@ -54,6 +54,87 @@ def load_yolo_model_safely(weights_path: str):
         logger.error(f"Failed to load YOLO model from {weights_path}: {e}")
         raise
 
+def generate_score_analysis(score_type: str, score_value: int, image, address: str, additional_context: dict = None) -> str:
+    """
+    Generate AI analysis for individual scores (severity, impact, criticality)
+    
+    Args:
+        score_type: Type of score ('severity', 'impact', 'criticality')
+        score_value: The score value
+        image: PIL Image object
+        address: Location address
+        additional_context: Additional context for the analysis
+    
+    Returns:
+        One-line AI analysis of the score
+    """
+    logger.info(f"=== GENERATING {score_type.upper()} SCORE ANALYSIS ===")
+    logger.info(f"Score: {score_value}, Address: {address}")
+    
+    try:
+        api_key = os.getenv("GOOGLE_API_KEY")
+        if not api_key:
+            return f"{score_type.capitalize()} score: {score_value} - Unable to generate analysis (API key missing)"
+        
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel('gemini-1.5-flash-latest')
+        
+        if score_type == "severity":
+            prompt = f"""Analyze this image at {address} and provide a ONE-LINE analysis of the severity score {score_value}/1000.
+            
+Context: This severity score measures how severe the urban issue (potholes/trash) appears in the image.
+Score Range: 1-1000 (1=minimal issue, 1000=extremely severe)
+Current Score: {score_value}
+
+Provide ONLY a single line explaining what this severity score means based on what you see in the image. Focus on visual damage/impact."""
+
+        elif score_type == "impact":
+            ctx = additional_context or {}
+            pop = ctx.get('population_estimate', 'unknown')
+            vehicles = ctx.get('vehicle_estimate', 'unknown')
+            
+            prompt = f"""Analyze the impact score {score_value}/100 for this location: {address}.
+            
+Context: This impact score measures how many people/vehicles are affected by this urban issue.
+Score Range: 1-100 (1=minimal impact, 100=maximum impact)
+Current Score: {score_value}
+Population Estimate: {pop}
+Vehicle Estimate: {vehicles}
+
+Provide ONLY a single line explaining what this impact score means for the community and traffic at this location."""
+
+        elif score_type == "criticality":
+            ctx = additional_context or {}
+            severity = ctx.get('severity_score', 'unknown')
+            impact = ctx.get('impact_score', 'unknown')
+            
+            prompt = f"""Analyze the criticality score {score_value}/100 for this urban issue at {address}.
+            
+Context: This criticality score combines severity ({severity}/1000) and impact ({impact}/100) to determine priority.
+Score Range: 1-100 (1=low priority, 100=urgent priority)
+Current Score: {score_value}
+
+Provide ONLY a single line explaining what this criticality score means for municipal priority and response urgency."""
+
+        else:
+            return f"{score_type.capitalize()} score: {score_value} - Unknown score type"
+        
+        logger.info(f"Sending {score_type} analysis prompt to Gemini")
+        response = model.generate_content([prompt, image])
+        analysis = response.text.strip()
+        
+        # Ensure it's a single line
+        analysis = analysis.split('\n')[0][:500]  # Take first line, max 500 chars
+        
+        logger.info(f"{score_type.capitalize()} analysis generated: {analysis[:100]}...")
+        return analysis
+        
+    except Exception as e:
+        error_analysis = f"{score_type.capitalize()} score: {score_value} - Analysis generation failed: {str(e)}"
+        logger.error(f"Failed to generate {score_type} analysis: {e}")
+        return error_analysis
+
+
 def process_image(image, address="Unknown location", pothole_weights="app/ai/models/pothole.pt", trash_weights="app/ai/models/trash_new.pt"):
     """
     Process image for urban monitoring
