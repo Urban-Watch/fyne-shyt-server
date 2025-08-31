@@ -8,27 +8,29 @@ logger = logging.getLogger(__name__)
 
 def normalize_urgency(age_seconds: float, cap_days: float = 30.0) -> float:
     """
-    Normalize urgency (how old the problem is) to [0,1].
+    Normalize urgency (how old the problem is) to [1,100].
     - age_seconds: time since report in seconds
-    - cap_days: age at which urgency saturates to 1.0 (default 30 days)
-    Uses linear normalization: urgency = min(1, age_days / cap_days).
+    - cap_days: age at which urgency saturates to 100 (default 30 days)
+    Uses linear normalization with minimum value of 1: urgency = max(1, min(100, (age_days / cap_days) * 99 + 1)).
     """
     age_days = max(0.0, age_seconds) / (3600.0 * 24.0)
-    result = min(1.0, age_days / max(1e-9, cap_days))
+    # Scale to 1-100 range instead of 0-100
+    result = max(1.0, min(100.0, (age_days / max(1e-9, cap_days)) * 99.0 + 1.0))
     # logger.debug(f"normalize_urgency: age_seconds={age_seconds}, cap_days={cap_days}, age_days={age_days:.2f}, result={result:.4f}")
     return result
 
 def normalize_reports(count: int, report_cap: int = 10) -> float:
     """
-    Normalize report_count to [0,1] using a logarithmic curve so
-    repeated reports give diminishing returns.
-    - report_cap: value at which normalization reaches ~1 (default 10)
+    Simple normalization of report_count to [1,100] with linear scaling.
+    - count=1 returns 1.0
+    - count=report_cap returns 100.0
     """
-    if count <= 0:
-        logger.debug(f"normalize_reports: count={count}, returning 0.0")
-        return 0.0
-    # log1p gives diminishing returns; divide by log1p(report_cap) to scale to ~[0,1]
-    result = min(1.0, math.log1p(count) / max(1e-9, math.log1p(report_cap)))
+    if count <= 1:
+        logger.debug(f"normalize_reports: count={count}, returning 1.0")
+        return 1.0
+    
+    # Linear scaling from 1 to 100
+    result = min(100.0, 1.0 + (count - 1) * (99.0 / (report_cap - 1)))
     # logger.debug(f"normalize_reports: count={count}, report_cap={report_cap}, result={result:.4f}")
     return result
 
@@ -41,81 +43,80 @@ def compute_criticality_score(
     caps: Optional[Dict[str, float]] = None
 ) -> Dict[str, Any]:
     """
+    Compute criticality score using base formula with logarithmic report multiplier.
+    
     Returns dict:
       {
-        "criticality": float (0-100),
-        "components": {"severity":..., "impact_norm":..., "urgency":..., "reports_norm":...},
-        "raw_score": float (0-1),
+        "criticality": float (1-100),
+        "components": {"severity":..., "impact":..., "urgency":..., "base_score":..., "log_multiplier":...},
+        "raw_score": float,
         "formula": str
       }
-    IMPROVED Formula (weighted average):
-      criticality_raw = w_s*severity + w_i*impact_norm + w_u*urgency + w_r*reports_norm
-      criticality = criticality_raw * 100
+    FORMULA:
+      base_score = (severity + impact) * urgency / 2
+      criticality = base_score * (1 + max(0, log(report_count)))
     """
 
-    logger.info("=== CRITICALITY_SCORE.PY COMPUTE_CRITICALITY_SCORE STARTED (IMPROVED) ===")
+    logger.info("=== CRITICALITY_SCORE.PY COMPUTE_CRITICALITY_SCORE STARTED (MULTIPLICATIVE) ===")
     logger.info(f"Input: severity={severity}, impact={impact}, age_seconds={age_seconds}, report_count={report_count}")
 
-    # --- defaults (tweakable) - IMPROVED WEIGHTS ---
-    if weights is None:
-        weights = {"severity": 0.5, "impact": 0.3, "urgency": 0.15, "reports": 0.05}
-    # ensure weights sum to 1 (normalize if not)
-    w_sum = sum(weights.values())
-    weights = {k: v / w_sum for k, v in weights.items()}
-    logger.info(f"Normalized weights: {weights}")
+    # --- normalize severity (0-100 -> 0-100, just clamp) ---
+    severity_norm = max(0.0, min(100.0, float(severity)))
+    logger.info(f"Severity normalized: {severity_norm}")
 
-    if caps is None:
-        caps = {"pop_scale": 100.0}  # unused here, kept for future extension
-
-    # --- clamp severity ---
-    sev = max(0.0, min(1.0, float(severity)))
-    logger.info(f"Severity normalized: {sev}")
-
-    # --- normalize impact (0-100 -> 0-1) ---
-    impact_norm = max(0.0, min(1.0, float(impact) / 100.0))
+    # --- normalize impact (0-100 -> 0-100, just clamp) ---
+    impact_norm = max(0.0, min(100.0, float(impact)))
     logger.info(f"Impact normalized: {impact_norm}")
 
-    # --- urgency normalization ---
+    # --- urgency normalization (1-100, minimum value 1) ---
     if age_seconds is None:
-        # If age unknown, treat as low urgency by default (0)
-        urgency_norm = 0.0
-        logger.info("Age seconds is None, setting urgency_norm to 0.0")
+        # If age unknown, treat as low urgency but minimum 1
+        urgency_norm = 1.0
+        logger.info("Age seconds is None, setting urgency_norm to 1.0")
     else:
         urgency_norm = normalize_urgency(age_seconds, cap_days=30.0)
         logger.info(f"Urgency normalized: {urgency_norm} from age_seconds={age_seconds}")
 
-    # --- reports normalization ---
+    # --- reports normalization (1-100, minimum value 1) ---
     reports_norm = normalize_reports(report_count, report_cap=10)
     logger.info(f"Reports normalized: {reports_norm} from report_count={report_count}")
 
-    # --- IMPROVED WEIGHTED AVERAGE FORMULA ---
-    raw_score = (
-        weights["severity"] * sev +
-        weights["impact"] * impact_norm +
-        weights["urgency"] * urgency_norm +
-        weights["reports"] * reports_norm
-    )
+    # --- MULTIPLICATIVE FORMULA with logarithmic report multiplier ---
+    # Base score: (severity + impact) * urgency / 2
+    base_score = (severity_norm + impact_norm) * urgency_norm / 2.0
     
-    # Convert to integer with ceiling to ensure minimum value of 1
+    # Apply logarithmic report multiplier: 1 + min(0, log(report_count))
+    # Note: log of values < 1 gives negative numbers, so min(0, log(x)) = 0 for x >= 1
+    if report_count <= 1:
+        log_multiplier = 1.0  # 1 + 0 = 1 for single reports
+    else:
+        log_multiplier = 1.0 + max(0.0, math.log(report_count))  # 1 + log(count) for multiple reports
+    
+    raw_score = base_score * log_multiplier
+    
+    # Clamp to 1-100 range and convert to integer with ceiling to ensure minimum value of 1
     import math
-    criticality_float = raw_score * 100.0
-    criticality = max(1, math.ceil(criticality_float))
+    clamped_score = max(1.0, min(100.0, raw_score))  # Cap at 100 maximum
+    criticality = max(1, math.ceil(clamped_score))
 
-    logger.info(f"Raw score calculation: {raw_score:.4f}")
-    logger.info(f"Final criticality score: {criticality_float:.2f} -> {criticality} (1-100 scale)")
-    logger.info(f"Formula used: Weighted Average (severity:{weights['severity']}, impact:{weights['impact']}, urgency:{weights['urgency']}, reports:{weights['reports']})")
+    logger.info(f"Base score calculation: ({severity_norm} + {impact_norm}) * {urgency_norm} / 2 = {base_score:.2f}")
+    logger.info(f"Log multiplier: 1 + max(0, log({report_count})) = {log_multiplier:.2f}")
+    logger.info(f"Raw score: {base_score:.2f} * {log_multiplier:.2f} = {raw_score:.2f}")
+    logger.info(f"Clamped score: {clamped_score:.2f}")
+    logger.info(f"Final criticality score: {criticality} (1-100 scale)")
+    logger.info(f"Formula used: (severity + impact) * urgency / 2 * (1 + max(0, log(reports)))")
 
     result = {
         "criticality": criticality,
-        "raw_score": round(float(raw_score), 4),
-        "formula": "weighted_average",
+        "raw_score": round(float(raw_score), 2),
+        "formula": "multiplicative_with_log_reports",
         "components": {
-            "severity": round(sev, 3),
-            "severity_adj": round(sev_adj, 3),
-            "impact_norm": round(impact_norm, 3),
-            "urgency": round(urgency_norm, 3),
-            "reports_norm": round(reports_norm, 3),
-            "weights": {k: round(v, 3) for k, v in weights.items()}
+            "severity": round(severity_norm, 2),
+            "impact": round(impact_norm, 2),
+            "urgency": round(urgency_norm, 2),
+            "base_score": round(base_score, 2),
+            "log_multiplier": round(log_multiplier, 2),
+            "report_count": report_count
         }
     }
     return result

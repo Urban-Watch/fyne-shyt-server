@@ -1,11 +1,14 @@
 from fastapi import APIRouter, HTTPException, status
 from typing import Dict, Any, Optional
+import logging
 
 from app.models.report import ReportUpdate, ReportStatus
 from app.services.report_service import report_service
 from app.services.user_service import user_service
 from app.db.redis_client import cache_service
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
@@ -73,9 +76,13 @@ async def get_all_reports(
 ):
     """Get all reports with filtering and pagination (admin only)"""
     try:
-        # Check cache first
+        # Check cache first (with error handling)
         cache_key = f"admin:reports:{status_filter}:{category}:{limit}:{offset}"
-        cached_result = await cache_service.get(cache_key)
+        cached_result = None
+        try:
+            cached_result = await cache_service.get(cache_key)
+        except Exception as cache_error:
+            logger.warning(f"Cache get failed, proceeding without cache: {cache_error}")
         
         if cached_result:
             return cached_result
@@ -123,8 +130,11 @@ async def get_all_reports(
             }
         }
         
-        # Cache the result
-        await cache_service.set(cache_key, response_data, 300)  # 5 minutes cache
+        # Cache the result (with error handling)
+        try:
+            await cache_service.set(cache_key, response_data, 300)  # 5 minutes cache
+        except Exception as cache_error:
+            logger.warning(f"Cache set failed, proceeding anyway: {cache_error}")
         
         return response_data
         

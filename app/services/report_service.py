@@ -36,6 +36,12 @@ class ReportService:
                 "images": report_data.get("images", []),
                 "location": report_data["location"],
                 "criticality_score": report_data["criticality_score"],
+                "severity_score": report_data.get("severity_score"),
+                "severity_analysis": report_data.get("severity_analysis"),
+                "impact_score": report_data.get("impact_score"),
+                "impact_analysis": report_data.get("impact_analysis"),
+                "population_estimate": report_data.get("population_estimate"),
+                "vehicle_estimate": report_data.get("vehicle_estimate"),
                 "status": ReportStatus.WAITING_FOR_ATTENTION.value,
                 "created_at": now,
                 "updated_at": now

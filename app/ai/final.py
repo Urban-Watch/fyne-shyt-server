@@ -238,6 +238,97 @@ Respond ONLY with TITLE and DESCRIPTION sections. No other text."""
             os.unlink(temp_path)
             logger.info(f"Cleaned up temporary file: {temp_path}")
 
+
+def generate_score_analysis(image, score_type: str, score_value: int, additional_context: dict = None) -> str:
+    """
+    Generate AI analysis for individual scores using Gemini API with image context
+    
+    Args:
+        image: PIL Image object or bytes
+        score_type: Type of score ('severity', 'impact', 'criticality')
+        score_value: The numeric score value
+        additional_context: Additional context like location, category, etc.
+    
+    Returns:
+        String analysis explaining the score
+    """
+    logger.info(f"=== GENERATING {score_type.upper()} SCORE ANALYSIS ===")
+    logger.info(f"Score: {score_value}, Context: {additional_context}")
+    
+    try:
+        # Handle different image input types
+        if isinstance(image, bytes):
+            pil_image = PIL.Image.open(io.BytesIO(image))
+        elif isinstance(image, PIL.Image.Image):
+            pil_image = image
+        else:
+            logger.error(f"Unsupported image format for analysis: {type(image)}")
+            return f"Unable to analyze {score_type} score due to image format issue"
+
+        # Get API key
+        api_key = os.getenv("GOOGLE_API_KEY")
+        if not api_key:
+            logger.error("No GOOGLE_API_KEY found for score analysis")
+            return f"Unable to generate {score_type} analysis"
+
+        # Configure Gemini
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel('gemini-1.5-flash-latest')
+
+        # Create role-specific prompts (optimized for concise output)
+        if score_type == "severity":
+            prompt = f"""You are a road infrastructure expert analyzing this urban image. 
+
+The AI assigned a SEVERITY SCORE of {score_value}/1000.
+
+Provide a concise 2-sentence explanation focusing on:
+- Physical damage visible (depth, size, surface condition)
+- Safety hazards for vehicles/pedestrians
+
+Context: {additional_context.get('category', 'urban issue')} at {additional_context.get('address', 'location')}
+
+Keep response under 200 words."""
+
+        elif score_type == "impact":
+            prompt = f"""You are an urban planning specialist analyzing this image for community impact.
+
+The AI calculated an IMPACT SCORE of {score_value}/100.
+
+Provide a concise 2-sentence explanation focusing on:
+- How many people this affects (traffic, nearby buildings)
+- Economic impact on local community
+
+Context: {additional_context.get('category', 'urban issue')} at {additional_context.get('address', 'location')}
+
+Keep response under 200 words."""
+
+        elif score_type == "criticality":
+            prompt = f"""You are an emergency response coordinator evaluating this image for action priority.
+
+The AI calculated a CRITICALITY SCORE of {score_value}/100.
+
+Provide a concise 2-sentence explanation focusing on:
+- Immediate safety risks visible in image
+- Urgency level for repair/response
+
+Context: {additional_context.get('category', 'urban issue')} at {additional_context.get('address', 'location')}
+
+Keep response under 200 words."""
+
+        else:
+            return f"Unknown score type: {score_type}"
+
+        logger.info(f"Sending {score_type} analysis prompt to Gemini")
+        response = model.generate_content([prompt, pil_image])
+        analysis_text = response.text.strip()
+        
+        logger.info(f"{score_type.upper()} analysis generated: {analysis_text[:100]}...")
+        return analysis_text
+
+    except Exception as e:
+        logger.error(f"Error generating {score_type} analysis: {e}")
+        return f"Analysis unavailable for {score_type} score {score_value}"
+
 # # --- Example Run ---
 # if __name__ == "__main__":
 #     # Example with PIL Image

@@ -10,7 +10,7 @@ import io
 # Add the app directory to path so we can import the AI modules
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
-from app.ai.final import process_image as process_image_ai
+from app.ai.final import process_image as process_image_ai, generate_score_analysis
 from app.ai.criticality_score import compute_criticality_score
 from app.ai.impact import calculate_impact_score
 
@@ -105,22 +105,61 @@ class AIService:
         # Step 4: Calculate final criticality score
         logger.info("Step 4: Calculating final criticality score")
         criticality_result = compute_criticality_score(
-            severity=image_analysis["severity_score"],  # Convert 1-100 to 0-1 scale for calculation
+            severity=image_analysis["severity_score"],          # Already 1-100 scale
             impact=impact_result["impact_score"],               # 1-100 scale
             age_seconds=age_seconds,
             report_count=report_count
         )
         logger.info(f"Criticality calculation result: {criticality_result}")
 
-        # Step 5: Combine all results
-        logger.info("Step 5: Combining all AI analysis results")
+        # Step 5: Generate individual score analyses using image context
+        logger.info("Step 5: Generating AI analyses for individual scores")
+        
+        analysis_context = {
+            "category": image_analysis["category"],
+            "address": address,
+            "latitude": latitude,
+            "longitude": longitude
+        }
+        
+        # Generate severity analysis
+        severity_analysis = generate_score_analysis(
+            image=image,
+            score_type="severity",
+            score_value=image_analysis["severity_score"],
+            additional_context=analysis_context
+        )
+        
+        # Generate impact analysis 
+        impact_analysis = generate_score_analysis(
+            image=image,
+            score_type="impact", 
+            score_value=impact_result["impact_score"],
+            additional_context=analysis_context
+        )
+        
+        # Generate criticality analysis
+        criticality_analysis = generate_score_analysis(
+            image=image,
+            score_type="criticality",
+            score_value=criticality_result["criticality"],
+            additional_context=analysis_context
+        )
+        
+        logger.info("Score analyses generated successfully")
+
+        # Step 6: Combine all results
+        logger.info("Step 6: Combining all AI analysis results")
         final_result = {
             "severity_score": image_analysis["severity_score"],
+            "severity_analysis": severity_analysis,
             "category": image_analysis["category"],
             "title": image_analysis["title"],
             "description": image_analysis["description"],
             "criticality_score": criticality_result["criticality"],
+            "criticality_analysis": criticality_analysis,
             "impact_score": impact_result["impact_score"],
+            "impact_analysis": impact_analysis,
             "population_estimate": impact_result.get("population_estimate"),
             "vehicle_estimate": impact_result.get("vehicle_estimate"),
             "ai_analysis_success": True,
